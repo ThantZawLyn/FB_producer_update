@@ -10,4 +10,4 @@ RUN ln -sf /usr/share/zoneinfo/Asia/Yangon /etc/localtime
 WORKDIR /app
 
 #COPY . /app/ /app/
-COPY ./app/ /app
+COPY ./app/ /app/
