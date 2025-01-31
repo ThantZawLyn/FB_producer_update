@@ -2,7 +2,7 @@ from datetime import datetime
 
 from dateutil import parser
 
-from sqlalchemy import false, or_, text, true
+from sqlalchemy import false, or_, text, true, desc
 
 from ..database import db
 from ..database.models import (Post, Subtask, SubtaskType, Task, TaskKeyword,
@@ -207,12 +207,25 @@ def get_tasks_query():
                     ' minute\'::interval) < \'' + str(datetime.now()) +
                     "\' or tasks.finish_time is Null)")
         ).order_by(Task.received_time)
+    
+    queue_count = db.session.query(Task).filter(Task.status == TaskStatus.in_queue).count()
+    print("Tasks with in_queue count: {}".format(queue_count))
+
+    if queue_count > 0:
+        return db.session.query(Task.id).filter(
+            Task.status == TaskStatus.in_queue
+        ).order_by(desc(Task.received_time))
 
     return db.session.query(Task.id).filter(
         task_ready_to_send_condition_repeat_send()
+    ).order_by(Task.finish_time)
+    
+    
+    """return db.session.query(Task.id).filter(
+        task_ready_to_send_condition_repeat_send()
     ).order_by(
         text('(tasks.received_time + (tasks.interval || \' minute\')::interval)')
-    )
+    )"""
 
 
 def get_like_ready_to_sent():
@@ -244,8 +257,14 @@ def task_ready_to_send_condition_repeat_send():
         '(tasks.received_time is not Null) and (tasks.received_time + (tasks.interval || \' minute\')::interval) < \'' + str(
             datetime.now()) + '\'' +
         ' and tasks.enabled = true'
-        ' and (tasks.status = \'success\' or tasks.status = \'retry\' or tasks.status = \'in_queue\'or tasks.status is Null)')
+        ' and (tasks.status = \'success\')')
 
+"""def task_ready_to_send_condition_repeat_send():
+    return text(
+        '(tasks.received_time is not Null) and (tasks.received_time + (tasks.interval || \' minute\')::interval) < \'' + str(
+            datetime.now()) + '\'' +
+        ' and tasks.enabled = true'
+        ' and (tasks.status = \'success\' or tasks.status = \'retry\' or tasks.status = \'in_queue\'or tasks.status is Null)')"""
 
 def get_available_wc():
     available_wc_count = db.session.query(WorkerCredential).filter(

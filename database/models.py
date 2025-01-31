@@ -33,6 +33,7 @@ class Post(db.Model):
     stat_id = Column(Integer, ForeignKey('post_stat.id'))
 
     fb_post_id = Column('fb_post_id', VARCHAR(1024))
+    fb_post_id_new = Column('fb_post_id_new', VARCHAR(1024))
     fb_repost_id = Column('fb_repost_id', VARCHAR(128))
     fb_repost_link = Column('fb_repost_link', VARCHAR(2048))
     fb_post_link = Column('fb_post_link', VARCHAR(1024))

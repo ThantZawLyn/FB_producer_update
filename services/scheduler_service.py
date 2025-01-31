@@ -109,8 +109,8 @@ def split_wc_between_tasks(count):
 
 #   comment_count = subtask_count - like_count - share_count - personal_data_count
  
-    task_count = count
-    #task_count = round((count / 100) * TASK_PERCENTAGE)
+    #task_count = count
+    task_count = round((count / 100) * TASK_PERCENTAGE)
     subtask_count = count - task_count
 
     like_count = 0
