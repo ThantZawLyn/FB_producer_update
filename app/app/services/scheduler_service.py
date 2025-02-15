@@ -16,9 +16,9 @@ from .celery_service import (send, send_keyword_by_task, send_source_by_task,
                              send_subtask)
 from .credentials_management import accounts_warming, proxy_re_enable
 
-TASK_PERCENTAGE = 100
+TASK_PERCENTAGE = 80
 SUBTASK_LIKE_PERCENTAGE = 0
-SUBTASK_COMMENT_PERCENTAGE = 0
+SUBTASK_COMMENT_PERCENTAGE = 20
 SUBTASK_SHARE_PERCENTAGE = 0
 SUBTASK_PERSONAL_DATA_PERCENTAGE = 0
 tl = Timeloop()
@@ -118,7 +118,7 @@ def split_wc_between_tasks(count):
     personal_data_count = 0
     #personal_data_count = count - task_count
     #personal_data_count = round((count / 100) * SUBTASK_PERSONAL_DATA_PERCENTAGE)
-    comment_count = 0
+    comment_count = subtask_count
     #comment_count = subtask_count - personal_data_count
 
 #    comment_count = subtask_count - like_count - share_count - personal_data_count
