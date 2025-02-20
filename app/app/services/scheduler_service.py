@@ -16,9 +16,9 @@ from .celery_service import (send, send_keyword_by_task, send_source_by_task,
                              send_subtask)
 from .credentials_management import accounts_warming, proxy_re_enable
 
-TASK_PERCENTAGE = 80
+TASK_PERCENTAGE = 90
 SUBTASK_LIKE_PERCENTAGE = 0
-SUBTASK_COMMENT_PERCENTAGE = 20
+SUBTASK_COMMENT_PERCENTAGE = 10
 SUBTASK_SHARE_PERCENTAGE = 0
 SUBTASK_PERSONAL_DATA_PERCENTAGE = 0
 tl = Timeloop()
