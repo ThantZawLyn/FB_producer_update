@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from dateutil import parser
 
@@ -179,23 +179,36 @@ def get_keywords_ready_to_sent():
 def get_sources_ready_to_sent():
     return db.session.query(TaskSource). \
         join(Task, TaskSource.task_id == Task.id).filter(Task.id.in_(get_tasks_query()))
-
+        
 
 def get_tasks_query():
-    none_count = db.session.query(Task).filter(Task.status.is_(None)).count()
+    now = datetime.now()
+    two_days_ago = now - timedelta(days=2)
+
+    # Get count of new tasks with status NULL
+    #none_count = db.session.query(Task).filter(Task.status.is_(None)).count()
+    none_count = db.session.query(Task).filter(
+        Task.status.is_(None),
+        (Task.priority == 1) | 
+        ((Task.priority.is_(None)) | (Task.priority.in_([2, 3]))) & 
+        ((Task.finish_time.is_(None)) | (Task.finish_time < two_days_ago))
+    ).count()
     print("New tasks with null count: {}".format(none_count))
 
     if none_count > 0:
         return db.session.query(Task.id).filter(
-            Task.status.is_(None)
+            Task.status.is_(None),
+            (Task.priority == 1) | 
+            ((Task.priority.is_(None)) | (Task.priority.in_([2, 3]))) & 
+            ((Task.finish_time.is_(None)) | (Task.finish_time < two_days_ago))
         ).order_by(Task.id)
 
+    # Get count of tasks in retry state
     retry_new_task_count = db.session.query(Task).filter(
         Task.status == TaskStatus.retry
-    ).filter(text('((tasks.finish_time + \'' + str(3) +
-                    ' minute\'::interval) < \'' + str(datetime.now()) +
-                    "\' or tasks.finish_time is Null)")).count()    
-    
+    ).filter(
+        text(f"((tasks.finish_time + interval '3 minute') < '{now}' or tasks.finish_time is Null)")
+    ).count()
 
     print("Retry new task with finish time count: {}".format(retry_new_task_count))
 
@@ -203,30 +216,44 @@ def get_tasks_query():
         return db.session.query(Task.id).filter(
             Task.status == TaskStatus.retry
         ).filter(
-            text('((tasks.finish_time + \'' + str(3) +
-                    ' minute\'::interval) < \'' + str(datetime.now()) +
-                    "\' or tasks.finish_time is Null)")
+            text(f"((tasks.finish_time + interval '3 minute') < '{now}' or tasks.finish_time is Null)")
         ).order_by(Task.received_time)
-    
-    queue_count = db.session.query(Task).filter(Task.status == TaskStatus.in_queue).count()
-    print("Tasks with in_queue count: {}".format(queue_count))
 
-    if queue_count > 0:
+    # SUCCESS CONDITION (Repeat Send)
+    success_count = db.session.query(Task).filter(
+            text(
+                "(tasks.received_time is not Null) and "
+                "(tasks.finish_time + (tasks.interval || ' minute')::interval) < '" + str(now) + "'"
+                " and tasks.enabled = true"
+                " and (tasks.status = 'success')"
+            ),
+            (Task.priority == 1) | 
+            ((Task.priority.is_(None)) | (Task.priority.in_([2, 3]))) & 
+            ((Task.finish_time.is_(None)) | (Task.finish_time < two_days_ago))
+        ).count()
+    
+    print("Tasks with success status count: {}".format(success_count))
+
+    if success_count > 0:
         return db.session.query(Task.id).filter(
-            Task.status == TaskStatus.in_queue
-        ).order_by(desc(Task.received_time))
+            text(
+                "(tasks.received_time is not Null) and "
+                "(tasks.finish_time + (tasks.interval || ' minute')::interval) < '" + str(now) + "'"
+                " and tasks.enabled = true"
+                " and (tasks.status = 'success')"
+            ),
+            (Task.priority == 1) | 
+            ((Task.priority.is_(None)) | (Task.priority.in_([2, 3]))) & 
+            ((Task.finish_time.is_(None)) | (Task.finish_time < two_days_ago))
+        ).order_by(Task.finish_time)
 
+    # FINAL FALLBACK: Get any remaining tasks
     return db.session.query(Task.id).filter(
-        task_ready_to_send_condition_repeat_send()
+        task_ready_to_send_condition_repeat_send(),
+        (Task.priority == 1) | 
+        ((Task.priority.is_(None)) | (Task.priority.in_([2, 3]))) & 
+        ((Task.finish_time.is_(None)) | (Task.finish_time < two_days_ago))
     ).order_by(Task.finish_time)
-    
-    
-    """return db.session.query(Task.id).filter(
-        task_ready_to_send_condition_repeat_send()
-    ).order_by(
-        text('(tasks.received_time + (tasks.interval || \' minute\')::interval)')
-    )"""
-
 
 def get_like_ready_to_sent():
     return subtasks_query(SubtaskType.like)
@@ -253,22 +280,22 @@ def subtasks_query(subtask_type):
 
 
 def task_ready_to_send_condition_repeat_send():
-    return text(
-        '(tasks.received_time is not Null) and (tasks.received_time + (tasks.interval || \' minute\')::interval) < \'' + str(
-            datetime.now()) + '\'' +
-        ' and tasks.enabled = true'
-        ' and (tasks.status = \'success\')')
+    now = datetime.now()
+    two_days_ago = now - timedelta(days=2)
 
-"""def task_ready_to_send_condition_repeat_send():
     return text(
-        '(tasks.received_time is not Null) and (tasks.received_time + (tasks.interval || \' minute\')::interval) < \'' + str(
-            datetime.now()) + '\'' +
-        ' and tasks.enabled = true'
-        ' and (tasks.status = \'success\' or tasks.status = \'retry\' or tasks.status = \'in_queue\'or tasks.status is Null)')"""
+        "(tasks.received_time is not Null) "
+        "AND (tasks.finish_time + (tasks.interval || ' minute')::interval) < '" + str(now) + "' "
+        "AND tasks.enabled = true "
+        "AND tasks.status = 'success' "
+        "AND (tasks.priority = 1 OR "
+        "(tasks.priority IS NULL OR tasks.priority IN (2, 3)) "
+        "AND (tasks.finish_time IS NULL OR tasks.finish_time < '" + str(two_days_ago) + "'))"
+    )
 
 def get_available_wc():
     available_wc_count = db.session.query(WorkerCredential).filter(
-        WorkerCredential.attemp <= 10
+        WorkerCredential.attemp <= 2
     ).filter(
         WorkerCredential.inProgress == false()
     ).filter(
