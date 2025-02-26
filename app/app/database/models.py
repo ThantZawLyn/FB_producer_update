@@ -102,6 +102,7 @@ class Task(db.Model):
     finish_time = Column('finish_time', DateTime)
     status = Column('status', ENUM(TaskStatus))
     enabled = Column('enabled', Boolean)
+    priority = Column('priority', Integer)
 
 
 class Comment(db.Model):
